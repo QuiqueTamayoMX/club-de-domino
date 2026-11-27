@@ -321,6 +321,12 @@ export function GameScreen({
             canPlayAny={state.playableMoves.length > 0}
             mustPlayDoubleSix={state.mustPlayDoubleSix}
             lastAction={state.lastAction}
+            mySeat={state.mySeat}
+            lastPlayerName={
+              state.lastAction
+                ? (state.players[state.lastAction.seat]?.name ?? null)
+                : null
+            }
             onPlaySide={handleBoardPlaySide}
           />
 

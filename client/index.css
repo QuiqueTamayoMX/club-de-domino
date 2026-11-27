@@ -88,6 +88,31 @@
   animation: tilePop 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+@keyframes tileThrowIn {
+  0% {
+    transform: translate3d(var(--throw-x, 0px), var(--throw-y, 120px), 0)
+      scale(1.26) rotate(var(--throw-rot, -6deg));
+    opacity: 0.25;
+    filter: drop-shadow(0 18px 22px rgba(0, 0, 0, 0.58));
+  }
+  55% {
+    transform: translate3d(calc(var(--throw-x, 0px) * 0.12), calc(var(--throw-y, 120px) * 0.12), 0)
+      scale(1.1) rotate(0deg);
+    opacity: 1;
+    filter: drop-shadow(0 10px 14px rgba(0, 0, 0, 0.45));
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
+    opacity: 1;
+    filter: drop-shadow(0 0 0 rgba(0, 0, 0, 0));
+  }
+}
+
+.animate-tile-throw {
+  animation: tileThrowIn 750ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: transform, opacity;
+}
+
 @keyframes goldPulse {
   0%,
   100% {

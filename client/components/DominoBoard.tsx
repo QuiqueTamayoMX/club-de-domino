@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import type { BoardState, LastAction, PlacedTile, Tile } from '../../shared/types';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import type { BoardState, LastAction, PlacedTile, SeatIndex, Tile } from '../../shared/types';
 import { DominoTile } from './DominoTile';
 
 export interface DominoBoardProps {
@@ -10,6 +10,8 @@ export interface DominoBoardProps {
   canPlayAny?: boolean;
   mustPlayDoubleSix?: boolean;
   lastAction?: LastAction | null;
+  mySeat?: SeatIndex | null;
+  lastPlayerName?: string | null;
   onPlaySide: (side: 'left' | 'right') => void;
 }
 
@@ -78,7 +80,7 @@ function computeSnakeLayout(
       const turnCy = prevBottomY + GAP + U + 3;
 
       items.push({
-        key: `${placed.tile.id}-${i}`,
+        key: placed.tile.id,
         placed,
         cx: turnCx,
         cy: turnCy,
@@ -106,7 +108,7 @@ function computeSnakeLayout(
     const secondValue = dir === 1 || isDouble ? placed.rightValue : placed.leftValue;
 
     items.push({
-      key: `${placed.tile.id}-${i}`,
+      key: placed.tile.id,
       placed,
       cx,
       cy,
@@ -220,6 +222,8 @@ export function DominoBoard({
   canPlayAny = false,
   mustPlayDoubleSix = false,
   lastAction = null,
+  mySeat = null,
+  lastPlayerName = null,
   onPlaySide,
 }: DominoBoardProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -254,6 +258,21 @@ export function DominoBoard({
   const showLeftTarget = isMyTurn && selectedTile !== null && selectedSides.includes('left');
   const showRightTarget = isMyTurn && selectedTile !== null && selectedSides.includes('right');
   const lastPlayedTileId = lastAction?.type === 'play' ? lastAction.tile?.id : undefined;
+
+  const throwOriginStyle = useMemo((): CSSProperties | undefined => {
+    if (lastAction?.type !== 'play') return undefined;
+    const rel = ((lastAction.seat - (mySeat ?? 0)) + 4) % 4;
+    if (rel === 0) {
+      return { '--throw-x': '0px', '--throw-y': '140px', '--throw-rot': '-6deg' } as CSSProperties;
+    }
+    if (rel === 1) {
+      return { '--throw-x': '150px', '--throw-y': '0px', '--throw-rot': '8deg' } as CSSProperties;
+    }
+    if (rel === 2) {
+      return { '--throw-x': '0px', '--throw-y': '-140px', '--throw-rot': '6deg' } as CSSProperties;
+    }
+    return { '--throw-x': '-150px', '--throw-y': '0px', '--throw-rot': '-8deg' } as CSSProperties;
+  }, [lastAction, mySeat]);
 
   if (board.chain.length === 0) {
     const canPlaceEmpty = isMyTurn && selectedTile !== null && selectedSides.length > 0;
@@ -337,27 +356,31 @@ export function DominoBoard({
             transform: `scale(${layout.scale})`,
           }}
         >
-          {layout.items.map((item) => (
-            <div
-              key={item.key}
-              className="absolute"
-              style={{
-                left: `${item.cx - item.width / 2}px`,
-                top: `${item.cy - item.height / 2}px`,
-                width: `${item.width}px`,
-                height: `${item.height}px`,
-              }}
-            >
-              <DominoTile
-                tile={item.placed.tile}
-                leftValue={item.firstValue}
-                rightValue={item.secondValue}
-                orientation={item.orientation}
-                size="sm"
-                lastPlayed={lastPlayedTileId === item.placed.tile.id}
-              />
-            </div>
-          ))}
+          {layout.items.map((item) => {
+            const isJustPlayed = lastPlayedTileId === item.placed.tile.id;
+            return (
+              <div
+                key={item.key}
+                className={`absolute ${isJustPlayed ? 'z-20 animate-tile-throw' : ''}`}
+                style={{
+                  left: `${item.cx - item.width / 2}px`,
+                  top: `${item.cy - item.height / 2}px`,
+                  width: `${item.width}px`,
+                  height: `${item.height}px`,
+                  ...(isJustPlayed ? throwOriginStyle : undefined),
+                }}
+              >
+                <DominoTile
+                  tile={item.placed.tile}
+                  leftValue={item.firstValue}
+                  rightValue={item.secondValue}
+                  orientation={item.orientation}
+                  size="sm"
+                  lastPlayed={isJustPlayed}
+                />
+              </div>
+            );
+          })}
 
           {/* Left end drop zone / subtle end marker */}
           {showLeftTarget ? (
@@ -424,6 +447,19 @@ export function DominoBoard({
           )}
         </div>
       </div>
+
+      {/* Discreet last-play indicator so every tile placement is easy to follow */}
+      {lastAction?.type === 'play' && lastAction.tile && (
+        <div className="pointer-events-none absolute bottom-1.5 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-black/45 border border-amber-400/25 backdrop-blur-xs text-[11px] font-semibold text-amber-100/95 shadow">
+          <span className="truncate max-w-[140px]">
+            {lastPlayerName ?? `Asiento ${lastAction.seat + 1}`}
+          </span>
+          <span className="text-stone-300">tiró</span>
+          <strong className="font-display text-amber-300">
+            {lastAction.tile.a}·{lastAction.tile.b}
+          </strong>
+        </div>
+      )}
     </div>
   );
 }

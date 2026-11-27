@@ -43,7 +43,7 @@ const BOT_NAMES = [
   'Don Pepe',
   'Doña Meche',
 ];
-const BOT_STEP_DELAY_MS = 750;
+const BOT_STEP_DELAY_MS = 2000;
 
 interface StoredPlayer {
   id: string;

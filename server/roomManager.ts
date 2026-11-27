@@ -37,8 +37,8 @@ const BOT_NAMES = [
   'Doña Meche',
 ];
 
-const BOT_DELAY_MIN_MS = 850;
-const BOT_DELAY_MAX_MS = 1000;
+const BOT_DELAY_MIN_MS = 1900;
+const BOT_DELAY_MAX_MS = 2300;
 const HOST_GRACE_MS = 20_000;
 
 interface InternalPlayer {
