@@ -1,0 +1,19 @@
+{
+  "name": "Club de Dominó",
+  "short_name": "Club de Dominó",
+  "description": "Dominó de parejas en tiempo real para móvil y escritorio.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b3b29",
+  "theme_color": "#0b3b29",
+  "lang": "es-MX",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='28' fill='%230b3b29'/%3E%3Crect x='34' y='16' width='60' height='96' rx='12' fill='%23faf6ec' stroke='%23d4af37' stroke-width='4'/%3E%3Cline x1='40' y1='64' x2='88' y2='64' stroke='%233d2314' stroke-width='3'/%3E%3Ccircle cx='64' cy='64' r='4' fill='%23d4af37'/%3E%3Ccircle cx='50' cy='30' r='4.5' fill='%231e293b'/%3E%3Ccircle cx='78' cy='30' r='4.5' fill='%231e293b'/%3E%3Ccircle cx='50' cy='40' r='4.5' fill='%231e293b'/%3E%3Ccircle cx='78' cy='40' r='4.5' fill='%231e293b'/%3E%3Ccircle cx='50' cy='50' r='4.5' fill='%231e293b'/%3E%3Ccircle cx='78' cy='50' r='4.5' fill='%231e293b'/%3E%3Ccircle cx='50' cy='78' r='4.5' fill='%231e293b'/%3E%3Ccircle cx='78' cy='78' r='4.5' fill='%231e293b'/%3E%3Ccircle cx='50' cy='88' r='4.5' fill='%231e293b'/%3E%3Ccircle cx='78' cy='88' r='4.5' fill='%231e293b'/%3E%3Ccircle cx='50' cy='98' r='4.5' fill='%231e293b'/%3E%3Ccircle cx='78' cy='98' r='4.5' fill='%231e293b'/%3E%3C/svg%3E",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
