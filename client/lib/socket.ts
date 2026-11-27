@@ -9,6 +9,8 @@ import { soundEngine } from './soundEngine';
 
 const PLAYER_ID_KEY = 'domino_mx_player_id';
 const PLAYER_NAME_KEY = 'domino_mx_player_name';
+const ACTIVE_ROOM_KEY = 'domino_mx_active_room';
+const PLAYER_ID_COOKIE = 'domino_pid';
 
 function generatePlayerId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -19,21 +21,77 @@ function generatePlayerId(): string {
   return `p_${ts}_${rand}`;
 }
 
-export function getPlayerId(): string {
+function readCookie(name: string): string | null {
+  if (typeof document === 'undefined') return null;
   try {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      const existing = window.localStorage.getItem(PLAYER_ID_KEY);
-      if (existing && existing.trim().length > 0) {
-        return existing;
+    const prefix = `${encodeURIComponent(name)}=`;
+    const parts = document.cookie.split(';');
+    for (const part of parts) {
+      const trimmed = part.trim();
+      if (trimmed.startsWith(prefix)) {
+        return decodeURIComponent(trimmed.slice(prefix.length));
       }
-      const created = generatePlayerId();
-      window.localStorage.setItem(PLAYER_ID_KEY, created);
-      return created;
     }
   } catch {
-    // Fallback if localStorage is unavailable
+    // Ignore cookie errors
   }
-  return generatePlayerId();
+  return null;
+}
+
+function writeCookie(name: string, value: string, maxAgeDays = 30): void {
+  if (typeof document === 'undefined') return;
+  try {
+    const maxAge = maxAgeDays * 24 * 60 * 60;
+    document.cookie = `${encodeURIComponent(name)}=${encodeURIComponent(value)}; Max-Age=${maxAge}; Path=/; SameSite=Lax`;
+  } catch {
+    // Ignore cookie errors
+  }
+}
+
+function persistPlayerId(id: string): void {
+  try {
+    window.localStorage?.setItem(PLAYER_ID_KEY, id);
+  } catch {
+    // Ignore storage errors
+  }
+  try {
+    window.sessionStorage?.setItem(PLAYER_ID_KEY, id);
+  } catch {
+    // Ignore storage errors
+  }
+  writeCookie(PLAYER_ID_COOKIE, id, 30);
+}
+
+export function getPlayerId(): string {
+  if (typeof window === 'undefined') {
+    return generatePlayerId();
+  }
+
+  let existing: string | null = null;
+  try {
+    existing = window.localStorage?.getItem(PLAYER_ID_KEY) ?? null;
+  } catch {
+    // Ignore
+  }
+  if (!existing) {
+    try {
+      existing = window.sessionStorage?.getItem(PLAYER_ID_KEY) ?? null;
+    } catch {
+      // Ignore
+    }
+  }
+  if (!existing) {
+    existing = readCookie(PLAYER_ID_COOKIE);
+  }
+
+  if (existing && existing.trim().length > 0) {
+    persistPlayerId(existing);
+    return existing;
+  }
+
+  const created = generatePlayerId();
+  persistPlayerId(created);
+  return created;
 }
 
 export function getSavedPlayerName(): string {
@@ -48,12 +106,62 @@ export function getSavedPlayerName(): string {
 }
 
 export function savePlayerName(name: string): void {
+  const clean = name.trim();
   try {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      window.localStorage.setItem(PLAYER_NAME_KEY, name.trim());
-    }
+    window.localStorage?.setItem(PLAYER_NAME_KEY, clean);
   } catch {
     // Ignore storage errors
+  }
+  try {
+    window.sessionStorage?.setItem(PLAYER_NAME_KEY, clean);
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+export function getActiveRoomCode(): string {
+  if (typeof window === 'undefined') return '';
+  let code = '';
+  try {
+    code = window.localStorage?.getItem(ACTIVE_ROOM_KEY) ?? '';
+  } catch {
+    // Ignore
+  }
+  if (!code) {
+    try {
+      code = window.sessionStorage?.getItem(ACTIVE_ROOM_KEY) ?? '';
+    } catch {
+      // Ignore
+    }
+  }
+  return code.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
+}
+
+export function saveActiveRoomCode(roomCode: string): void {
+  const clean = roomCode.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
+  if (clean.length !== 4) return;
+  try {
+    window.localStorage?.setItem(ACTIVE_ROOM_KEY, clean);
+  } catch {
+    // Ignore
+  }
+  try {
+    window.sessionStorage?.setItem(ACTIVE_ROOM_KEY, clean);
+  } catch {
+    // Ignore
+  }
+}
+
+export function clearActiveRoomCode(): void {
+  try {
+    window.localStorage?.removeItem(ACTIVE_ROOM_KEY);
+  } catch {
+    // Ignore
+  }
+  try {
+    window.sessionStorage?.removeItem(ACTIVE_ROOM_KEY);
+  } catch {
+    // Ignore
   }
 }
 
@@ -84,6 +192,7 @@ function createNetlifyHttpSocket(): AppSocket {
   let pollTimer: number | null = null;
   let pollInFlight = false;
   let lastToastSignature = '';
+  let lifecycleBound = false;
 
   const trigger = (event: string, ...args: unknown[]) => {
     const set = listeners.get(event);
@@ -139,9 +248,18 @@ function createNetlifyHttpSocket(): AppSocket {
       };
       if (data.state) {
         activeRoomCode = data.state.roomCode;
+        saveActiveRoomCode(data.state.roomCode);
         trigger('state:update', data.state);
       }
       if (data.toast) {
+        if (
+          data.toast.type === 'error' &&
+          (data.toast.message.includes('no existe') ||
+            data.toast.message.includes('No estás sentado'))
+        ) {
+          activeRoomCode = null;
+          clearActiveRoomCode();
+        }
         emitToastOnce(data.toast, fromPoll);
       }
     } catch {
@@ -154,14 +272,40 @@ function createNetlifyHttpSocket(): AppSocket {
     }
   };
 
+  const syncNow = () => {
+    if (!connected || !activeRoomCode || pollInFlight) return;
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+      return;
+    }
+    pollInFlight = true;
+    void callApi('room:state', {}, true).finally(() => {
+      pollInFlight = false;
+    });
+  };
+
+  const bindLifecycleSync = () => {
+    if (lifecycleBound || typeof window === 'undefined' || typeof document === 'undefined') {
+      return;
+    }
+    lifecycleBound = true;
+
+    const handleResume = () => {
+      if (document.visibilityState === 'visible') {
+        syncNow();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleResume);
+    window.addEventListener('pageshow', () => syncNow());
+    window.addEventListener('focus', () => syncNow());
+    window.addEventListener('online', () => syncNow());
+  };
+
   const startPolling = () => {
+    bindLifecycleSync();
     if (pollTimer !== null || typeof window === 'undefined') return;
     pollTimer = window.setInterval(() => {
-      if (!connected || !activeRoomCode || pollInFlight) return;
-      pollInFlight = true;
-      void callApi('room:state', {}, true).finally(() => {
-        pollInFlight = false;
-      });
+      syncNow();
     }, 850);
   };
 

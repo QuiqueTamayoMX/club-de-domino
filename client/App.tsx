@@ -2,12 +2,16 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertCircle, CheckCircle2, Info, WifiOff } from 'lucide-react';
 import type { ClientGameState } from '../shared/types';
 import {
+  clearActiveRoomCode,
+  getActiveRoomCode,
   getPlayerId,
   getSavedPlayerName,
+  saveActiveRoomCode,
   savePlayerName,
   socket,
 } from './lib/socket';
 import { soundEngine } from './lib/soundEngine';
+import { useWakeLock } from './lib/useWakeLock';
 import { HomeScreen } from './components/HomeScreen';
 import { LobbyScreen } from './components/LobbyScreen';
 import { GameScreen } from './components/GameScreen';
@@ -40,7 +44,10 @@ export function App() {
   const prevGameStateRef = useRef<ClientGameState | null>(null);
   const latestRoomCodeRef = useRef<string | null>(null);
   const playerNameRef = useRef<string>(playerName);
+  const autoRejoinAttemptedRef = useRef(false);
   const toastIdRef = useRef(0);
+
+  useWakeLock(gameState?.phase === 'playing');
 
   useEffect(() => {
     playerNameRef.current = playerName;
@@ -81,6 +88,28 @@ export function App() {
           playerName: playerNameRef.current.trim() || 'Jugador',
           playerId,
         });
+        return;
+      }
+
+      // Auto-rejoin after iOS Safari / Chrome tab reload if player was already seated
+      if (!autoRejoinAttemptedRef.current) {
+        autoRejoinAttemptedRef.current = true;
+        const savedName = playerNameRef.current.trim();
+        const storedRoom = getActiveRoomCode();
+        const urlSala = readSalaParam();
+        const roomToResume =
+          urlSala && storedRoom && urlSala === storedRoom
+            ? urlSala
+            : !urlSala && storedRoom
+              ? storedRoom
+              : '';
+        if (savedName && roomToResume.length === 4) {
+          socket.emit('room:join', {
+            roomCode: roomToResume,
+            playerName: savedName,
+            playerId,
+          });
+        }
       }
     };
 
@@ -92,6 +121,9 @@ export function App() {
       const prevState = prevGameStateRef.current;
       prevGameStateRef.current = nextState;
       setGameState(nextState);
+      if (nextState.roomCode) {
+        saveActiveRoomCode(nextState.roomCode);
+      }
 
       // Sync ?sala=XXXX in URL so refreshing or sharing keeps room code
       if (typeof window !== 'undefined' && nextState.roomCode) {
@@ -155,6 +187,14 @@ export function App() {
     };
 
     const onToast = (payload: { type: 'info' | 'success' | 'error'; message: string }) => {
+      if (
+        payload.type === 'error' &&
+        (payload.message.includes('no existe') ||
+          payload.message.includes('llena') ||
+          payload.message.includes('No estás sentado'))
+      ) {
+        clearActiveRoomCode();
+      }
       addToast(payload);
     };
 

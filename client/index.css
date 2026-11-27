@@ -21,6 +21,8 @@
     font-family: var(--font-sans);
     background-color: #0b3b29;
     overscroll-behavior: none;
+    overscroll-behavior-y: none;
+    touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
     -webkit-font-smoothing: antialiased;
   }
